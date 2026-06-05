@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Firebase credentials — never commit these
+backend/service-account.json
+google-services.json
+GoogleService-Info.plist
+
+# Node
+node_modules/
+*.env
+.env.*

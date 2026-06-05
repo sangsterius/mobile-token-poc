@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mock Payment</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 36px;
+      width: 360px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+    h2 { font-size: 20px; font-weight: 600; margin-bottom: 24px; color: #111; }
+    .row { display: flex; justify-content: space-between; margin-bottom: 12px; }
+    .label { color: #6b7280; font-size: 14px; }
+    .value { font-weight: 500; font-size: 14px; }
+    .amount { font-size: 22px; font-weight: 700; color: #111; }
+    .divider { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }
+    button {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+
+    .pending-code {
+      font-size: 56px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 8px;
+      color: #2563eb;
+      margin: 20px 0;
+    }
+    .pending-label {
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .spinner {
+      text-align: center;
+      color: #9ca3af;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+
+    .success { text-align: center; }
+    .success-icon { font-size: 56px; margin-bottom: 12px; }
+    .success-title { font-size: 22px; font-weight: 700; color: #16a34a; }
+    .denied-title  { font-size: 22px; font-weight: 700; color: #dc2626; }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- View 1: payment form -->
+  <div id="view-form">
+    <h2>Mock Payment</h2>
+    <div class="row"><span class="label">To</span><span class="value">Jan Kowalski</span></div>
+    <div class="row"><span class="label">Account</span><span class="value">PL61 1090 1014 ...2223</span></div>
+    <hr class="divider" />
+    <div class="row"><span class="label">Amount</span><span class="amount">1 250,00 PLN</span></div>
+    <button class="btn-primary" onclick="startApproval()">Confirm Transfer</button>
+  </div>
+
+  <!-- View 2: waiting for phone -->
+  <div id="view-pending" class="hidden">
+    <h2>Approve on your phone</h2>
+    <p class="pending-label">Match this code in the app:</p>
+    <div class="pending-code" id="match-code">--</div>
+    <div class="spinner" id="spinner">⟳ waiting for approval…</div>
+  </div>
+
+  <!-- View 3: result -->
+  <div id="view-result" class="hidden">
+    <div class="success">
+      <div class="success-icon" id="result-icon"></div>
+      <div id="result-title"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Change this to your ngrok URL when testing on a physical device,
+  // or keep localhost for browser-only testing.
+  const BASE_URL = 'http://localhost:3000';
+
+  const AMOUNT = '1 250,00';
+  const PAYEE  = 'Jan Kowalski';
+
+  let pollTimer = null;
+
+  function show(viewId) {
+    ['view-form', 'view-pending', 'view-result'].forEach(id => {
+      document.getElementById(id).classList.toggle('hidden', id !== viewId);
+    });
+  }
+
+  async function startApproval() {
+    const res = await fetch(`${BASE_URL}/challenge/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: AMOUNT, payee: PAYEE }),
+    });
+    const { challengeId, code } = await res.json();
+
+    document.getElementById('match-code').textContent = code;
+    show('view-pending');
+    pollStatus(challengeId);
+  }
+
+  function pollStatus(challengeId) {
+    pollTimer = setInterval(async () => {
+      const res = await fetch(`${BASE_URL}/challenge/${challengeId}/status`);
+      const { status } = await res.json();
+
+      if (status === 'approved') {
+        clearInterval(pollTimer);
+        document.getElementById('result-icon').textContent  = '✓';
+        document.getElementById('result-title').className   = 'success-title';
+        document.getElementById('result-title').textContent = 'Transfer approved';
+        show('view-result');
+      } else if (status === 'denied') {
+        clearInterval(pollTimer);
+        document.getElementById('result-icon').textContent  = '✗';
+        document.getElementById('result-title').className   = 'denied-title';
+        document.getElementById('result-title').textContent = 'Transfer denied';
+        show('view-result');
+      }
+    }, 1000);
+  }
+</script>
+
+</body>
+</html>
